@@ -11,6 +11,9 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h"
+
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -28,11 +31,17 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* list of sleeping processes. Proceses are added to this list
+when they are sleep, and removed when wakeup_ticks() == ticks(). */
+static struct list *sleeping_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
 /* Initial thread, the thread running init.c:main(). */
 static struct thread *initial_thread;
+
+
 
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
@@ -92,6 +101,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init(&sleeping_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -119,6 +129,12 @@ thread_start (void)
 
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
+bool
+check_sleep_thread (void){
+
+  return list_empty(&sleeping_list);
+}
+
 void
 thread_tick (void) 
 {
@@ -212,12 +228,29 @@ thread_create (const char *name, int priority,
   return tid;
 }
 
+
+void
+thread_sleep(int64_t wakeup_this_ticks) 
+{
+  struct thread* curr_thread = running_thread();
+  curr_thread -> wakeup_tick = wakeup_this_ticks;
+
+  enum intr_level old_level = intr_disable();
+  list_push_back(&sleeping_list,&curr_thread -> elem);
+  thread_block();
+  intr_set_level(old_level);
+}
+
+
+
+
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
 
    This function must be called with interrupts turned off.  It
    is usually a better idea to use one of the synchronization
    primitives in synch.h. */
+
 void
 thread_block (void) 
 {
@@ -303,6 +336,31 @@ thread_exit (void)
   schedule ();
   NOT_REACHED ();
 }
+
+
+
+
+/* check sleeping thread and wake up thread if needed. */
+
+void find_wakeup_thread(void)
+{
+  struct list_elem* curr;
+
+  for(curr = list_begin(&sleeping_list); curr != list_tail(&sleeping_list);
+    curr = list_next(curr)){
+      
+      struct thread* curr_thread = list_entry(curr,struct thread,elem); //elem to thread
+      
+      if(curr_thread -> wakeup_tick == timer_ticks){
+        enum intr_level old_level = intr_disable ();
+        list_push_back(&ready_list,curr); //use semaphore?
+        thread_unblock(curr_thread);
+        intr_set_level (old_level);
+      }
+    }
+
+}
+
 
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
