@@ -33,7 +33,7 @@ static struct list all_list;
 
 /* list of sleeping processes. Proceses are added to this list
 when they are sleep, and removed when wakeup_ticks() == ticks(). */
-static struct list *sleeping_list;
+static struct list sleeping_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -79,6 +79,7 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+static int64_t next_tick_to_wake;
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -101,7 +102,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  list_init(&sleeping_list);
+  list_init (&sleeping_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -127,29 +128,42 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
-/* Called by the timer interrupt handler at each timer tick.
-   Thus, this function runs in an external interrupt context. */
+/* find sleeping thread. */
 bool
 check_sleep_thread (void){
 
-  return list_empty(&sleeping_list);
+  if(list_empty(&sleeping_list) == true)
+    return false; //nobody sleeps.
+  else return true;
 }
 
+
+
+/* Called by the timer interrupt handler at each timer tick.
+   Thus, this function runs in an external interrupt context. */
 void
 thread_tick (void) 
 {
+  
   struct thread *t = thread_current ();
 
+/* check sleeping thread which is needed to wake up.. */
+    if(check_sleep_thread() == true){
+      find_wakeup_thread();
+    }
+
+
   /* Update statistics. */
-  if (t == idle_thread)
+  if (t == idle_thread){
     idle_ticks++;
+  }
 #ifdef USERPROG
   else if (t->pagedir != NULL)
     user_ticks++;
 #endif
-  else
+  else{
     kernel_ticks++;
-
+  }
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
@@ -232,13 +246,16 @@ thread_create (const char *name, int priority,
 void
 thread_sleep(int64_t wakeup_this_ticks) 
 {
-  struct thread* curr_thread = running_thread();
-  curr_thread -> wakeup_tick = wakeup_this_ticks;
 
   enum intr_level old_level = intr_disable();
+
+  struct thread* curr_thread = thread_current();
+
+  curr_thread -> wakeup_tick = wakeup_this_ticks;
   list_push_back(&sleeping_list,&curr_thread -> elem);
   thread_block();
-  intr_set_level(old_level);
+
+  intr_enable();
 }
 
 
@@ -338,29 +355,28 @@ thread_exit (void)
 }
 
 
-
-
 /* check sleeping thread and wake up thread if needed. */
 
 void find_wakeup_thread(void)
 {
-  struct list_elem* curr;
+  
+  struct list_elem* curr = list_begin(&sleeping_list);
 
-  for(curr = list_begin(&sleeping_list); curr != list_tail(&sleeping_list);
-    curr = list_next(curr)){
-      
-      struct thread* curr_thread = list_entry(curr,struct thread,elem); //elem to thread
-      
-      if(curr_thread -> wakeup_tick == timer_ticks){
-        enum intr_level old_level = intr_disable ();
-        list_push_back(&ready_list,curr); //use semaphore?
-        thread_unblock(curr_thread);
-        intr_set_level (old_level);
-      }
+  while(1){
+    struct thread* curr_thread = list_entry(curr,struct thread,elem); //elem to thread
+
+    if(curr_thread -> wakeup_tick >= timer_ticks()){
+
+      curr = list_remove(curr); // curr to next elem.
+      thread_unblock(curr_thread);
     }
+    
+    if(list_empty(&sleeping_list) == true)
+      break; //nobody sleeps. exit.
+  }
 
-}
 
+  }
 
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
