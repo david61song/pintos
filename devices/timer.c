@@ -172,6 +172,7 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   if(check_sleep_thread() == true){
+    find_wakeup_thread();
     //check sleeping thread which needed to wake up..
   }
   
