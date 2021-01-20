@@ -131,26 +131,23 @@ thread_start (void)
 /* find sleeping thread. */
 bool
 check_sleep_thread (void){
-
   if(list_empty(&sleeping_list) == true)
     return false; //nobody sleeps.
   else return true;
 }
 
 
-
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
 thread_tick (void) 
-{
-  
-  struct thread *t = thread_current ();
+{  
+struct thread *t = thread_current ();
 
 /* check sleeping thread which is needed to wake up.. */
-    if(check_sleep_thread() == true){
-      find_wakeup_thread();
-    }
+  if(check_sleep_thread() == true){
+    find_wakeup_thread();
+  }
 
   /* Update statistics. */
   if (t == idle_thread){
@@ -242,7 +239,7 @@ thread_create (const char *name, int priority,
 }
 
 
-
+/* list_less_function for sleeping_list_insert_ordered. Inserting thread in order by smaller wakeup_tick values. */
 bool
 sleeping_list_insert_ordered(struct list_elem* a,struct list_elem* b){
   struct thread* thread_a = list_entry(a,struct thread,elem);
@@ -256,14 +253,15 @@ sleeping_list_insert_ordered(struct list_elem* a,struct list_elem* b){
 }
 
 
-
+/* Puts the current thread to sleep until wakeup_this_tick.  It will not be scheduled
+   again until awoken by find_wakeup_thread(). */
 void
-thread_sleep(int64_t wakeup_this_ticks){
+thread_sleep(int64_t wakeup_this_tick){
 
   enum intr_level old_level = intr_disable();
 
   struct thread* curr_thread = thread_current();
-  curr_thread -> wakeup_tick = wakeup_this_ticks;
+  curr_thread -> wakeup_tick = wakeup_this_tick;
   list_insert_ordered(&sleeping_list,&curr_thread -> elem,
   sleeping_list_insert_ordered,NULL);
   thread_block();
@@ -272,13 +270,15 @@ thread_sleep(int64_t wakeup_this_ticks){
 
 }
 
+
+
+
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
 
    This function must be called with interrupts turned off.  It
    is usually a better idea to use one of the synchronization
    primitives in synch.h. */
-
 void
 thread_block (void) 
 {
@@ -378,12 +378,10 @@ void find_wakeup_thread(void)
       break;
 
     struct thread* curr_thread = list_entry(curr,struct thread,elem); //elem to thread
-
     if(timer_ticks() >= curr_thread -> wakeup_tick){ //find thread to wake up.
       curr = list_remove(curr); // curr to next elem.
       thread_unblock(curr_thread);
     }
-
     else break; //we checked first element of sleeping list. So we don't need to check next element. exit.
 
   }
