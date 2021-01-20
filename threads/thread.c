@@ -152,7 +152,6 @@ thread_tick (void)
       find_wakeup_thread();
     }
 
-
   /* Update statistics. */
   if (t == idle_thread){
     idle_ticks++;
@@ -187,7 +186,7 @@ thread_print_stats (void)
    before thread_create() returns.  Contrariwise, the original
    thread may run for any amount of time before the new thread is
    scheduled.  Use a semaphore or some other form of
-   synchronization if you need to ensure ordering.
+   synchronization if you need to ensure ordereding.
 
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
@@ -243,23 +242,35 @@ thread_create (const char *name, int priority,
 }
 
 
-void
-thread_sleep(int64_t wakeup_this_ticks) 
-{
 
-  enum intr_level old_level = intr_disable();
+bool
+sleeping_list_insert_ordered(struct list_elem* a,struct list_elem* b){
+  struct thread* thread_a = list_entry(a,struct thread,elem);
+  struct thread* thread_b = list_entry(b,struct thread,elem);
 
-  struct thread* curr_thread = thread_current();
+  if(thread_a -> wakeup_tick < thread_b -> wakeup_tick)
+    return true;
+  
+  else return false;
 
-  curr_thread -> wakeup_tick = wakeup_this_ticks;
-  list_push_back(&sleeping_list,&curr_thread -> elem);
-  thread_block();
-
-  intr_enable();
 }
 
 
 
+void
+thread_sleep(int64_t wakeup_this_ticks){
+
+  enum intr_level old_level = intr_disable();
+
+  struct thread* curr_thread = thread_current();
+  curr_thread -> wakeup_tick = wakeup_this_ticks;
+  list_insert_ordered(&sleeping_list,&curr_thread -> elem,
+  sleeping_list_insert_ordered,NULL);
+  thread_block();
+
+  intr_set_level(old_level);
+
+}
 
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
@@ -363,16 +374,18 @@ void find_wakeup_thread(void)
   struct list_elem* curr = list_begin(&sleeping_list);
 
   while(1){
+    if(list_empty(&sleeping_list)) //if sleeping list is empty, breaks.
+      break;
+
     struct thread* curr_thread = list_entry(curr,struct thread,elem); //elem to thread
 
-    if(curr_thread -> wakeup_tick >= timer_ticks()){
-
+    if(timer_ticks() >= curr_thread -> wakeup_tick){ //find thread to wake up.
       curr = list_remove(curr); // curr to next elem.
       thread_unblock(curr_thread);
     }
-    
-    if(list_empty(&sleeping_list) == true)
-      break; //nobody sleeps. exit.
+
+    else break; //we checked first element of sleeping list. So we don't need to check next element. exit.
+
   }
 
 
