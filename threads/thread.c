@@ -253,6 +253,19 @@ sleeping_list_insert_ordered(struct list_elem* a,struct list_elem* b){
 }
 
 
+/* list_less_function for sleeping_list_insert_ordered. Inserting thread in order by bigger priority values. */
+bool
+list_insert_ordered_priority(struct list_elem* a, struct list_elem* b){
+  struct thread* thread_a = list_entry(a,struct thread,elem);
+  struct thread* thread_b = list_entry(a,struct thread,elem);
+
+  if( (thread_a -> priority) > (thread_b -> priority) )
+    return true;
+  else return false;
+
+}
+
+
 /* Puts the current thread to sleep until wakeup_this_tick.  It will not be scheduled
    again until awoken by find_wakeup_thread(). */
 void
@@ -306,7 +319,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem,list_insert_ordered_priority,NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -401,7 +414,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered (&ready_list, &cur->elem,list_insert_ordered_priority,NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
