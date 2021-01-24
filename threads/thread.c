@@ -241,12 +241,19 @@ thread_create (const char *name, int priority,
 
 /* list_less_function for sleeping_list_insert_ordered. Inserting thread in order by smaller wakeup_tick values. */
 bool
-sleeping_list_insert_ordered(struct list_elem* a,struct list_elem* b){
+order_by_wakeup_tick(struct list_elem* a,struct list_elem* b){
   struct thread* thread_a = list_entry(a,struct thread,elem);
   struct thread* thread_b = list_entry(b,struct thread,elem);
 
   if(thread_a -> wakeup_tick < thread_b -> wakeup_tick)
     return true;
+  
+  else if(thread_a -> wakeup_tick == thread_b -> wakeup_tick){
+    if(thread_a -> priority > thread_b -> priority)
+      return true;
+    else return false;
+  }
+
   
   else return false;
 
@@ -255,7 +262,7 @@ sleeping_list_insert_ordered(struct list_elem* a,struct list_elem* b){
 
 /* list_less_function for sleeping_list_insert_ordered. Inserting thread in order by bigger priority values. */
 bool
-list_insert_ordered_priority(struct list_elem* a, struct list_elem* b){
+order_by_priority(struct list_elem* a, struct list_elem* b){
   struct thread* thread_a = list_entry(a,struct thread,elem);
   struct thread* thread_b = list_entry(a,struct thread,elem);
 
@@ -276,7 +283,7 @@ thread_sleep(int64_t wakeup_this_tick){
   struct thread* curr_thread = thread_current();
   curr_thread -> wakeup_tick = wakeup_this_tick;
   list_insert_ordered(&sleeping_list,&curr_thread -> elem,
-  sleeping_list_insert_ordered,NULL);
+  order_by_wakeup_tick,NULL);
   thread_block();
 
   intr_set_level(old_level);
@@ -319,7 +326,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered (&ready_list, &t->elem,list_insert_ordered_priority,NULL);
+  list_insert_ordered (&ready_list, &t->elem,order_by_wakeup_tick,NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -383,7 +390,6 @@ thread_exit (void)
 
 void find_wakeup_thread(void)
 {
-  
   struct list_elem* curr = list_begin(&sleeping_list);
 
   while(1){
@@ -391,6 +397,7 @@ void find_wakeup_thread(void)
       break;
 
     struct thread* curr_thread = list_entry(curr,struct thread,elem); //elem to thread
+
     if(timer_ticks() >= curr_thread -> wakeup_tick){ //find thread to wake up.
       curr = list_remove(curr); // curr to next elem.
       thread_unblock(curr_thread);
@@ -414,7 +421,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered (&ready_list, &cur->elem,list_insert_ordered_priority,NULL);
+    list_insert_ordered (&ready_list, &cur->elem,order_by_wakeup_tick,NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -530,7 +537,7 @@ kernel_thread (thread_func *function, void *aux)
   function (aux);       /* Execute the thread function. */
   thread_exit ();       /* If function() returns, kill the thread. */
 }
-
+
 /* Returns the running thread. */
 struct thread *
 running_thread (void) 
@@ -626,6 +633,7 @@ thread_schedule_tail (struct thread *prev)
   /* Start new time slice. */
   thread_ticks = 0;
 
+
 #ifdef USERPROG
   /* Activate the new address space. */
   process_activate ();
@@ -663,6 +671,7 @@ schedule (void)
 
   if (cur != next)
     prev = switch_threads (cur, next);
+
   thread_schedule_tail (prev);
 }
 
@@ -679,7 +688,7 @@ allocate_tid (void)
 
   return tid;
 }
-
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
