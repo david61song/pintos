@@ -208,7 +208,6 @@ thread_tick (void)
   if(timer_ticks () >= next_tick_to_awake)
     thread_wakeup(); /* thread_wakeup() should find sleeping thread which needed to wake up. */
      
-  
   struct thread *t = thread_current ();
 
   /* Update statistics. */
@@ -222,6 +221,7 @@ thread_tick (void)
     kernel_ticks++;
 
   /* Enforce preemption. */
+  /* Round - robin */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
 }
@@ -403,7 +403,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur -> elem,order_by_wakeup_tick,NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
