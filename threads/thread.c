@@ -403,7 +403,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered(&ready_list, &cur -> elem,order_by_wakeup_tick,NULL);
+    list_push_back(&ready_list, &cur -> elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -630,6 +630,10 @@ thread_schedule_tail (struct thread *prev)
       ASSERT (prev != cur);
       palloc_free_page (prev);
     }
+    
+  if(prev != NULL && prev -> status != THREAD_DYING)
+    if(prev -> priority > cur -> priority)
+      thread_yield(); 
 }
 
 /* Schedules a new process.  At entry, interrupts must be off and
