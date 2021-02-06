@@ -133,7 +133,7 @@ order_by_wakeup_tick(struct list_elem* a, struct list_elem* b)
   struct thread* thread_a = list_entry(a,struct thread,elem);
   struct thread* thread_b = list_entry(b,struct thread,elem);
 
-  if(thread_a->wakeup_tick == thread_b->wakeup_tick)
+  if (thread_a->wakeup_tick == thread_b->wakeup_tick)
     return thread_a->priority > thread_b->priority;
 
   return thread_a->wakeup_tick < thread_b->wakeup_tick;
@@ -173,7 +173,7 @@ thread_wakeup (void)
   while(1)
   {
     struct thread* cur_thread = list_entry(cur, struct thread, elem); /* elem to thread. */
-    if(timer_ticks () >= cur_thread -> wakeup_tick)
+    if (timer_ticks () >= cur_thread -> wakeup_tick)
     {
       cur = list_remove(cur); //cur removed, cur to next elem.
       thread_unblock(cur_thread);
@@ -278,7 +278,8 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
+  if (t->priority > thread_get_priority ())
+    thread_yield ();
   return tid;
 }
 
@@ -419,7 +420,7 @@ thread_set_priority (int new_priority)
   struct thread* front_ready_thread = list_entry(list_begin(&ready_list), struct thread, elem);
 
   thread_current ()->priority = new_priority;
-  if(front_ready_thread->priority > new_priority)
+  if (front_ready_thread->priority > new_priority)
     thread_yield();
 }
 
@@ -621,8 +622,8 @@ thread_schedule_tail (struct thread *prev)
       palloc_free_page (prev);
     }
     
-  if(prev != NULL && prev -> status != THREAD_DYING)
-    if(prev -> priority > cur -> priority)
+  if (prev != NULL && prev -> status != THREAD_DYING)
+    if (prev -> priority > cur -> priority)
       thread_yield(); 
 }
 
