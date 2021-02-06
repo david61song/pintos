@@ -54,7 +54,6 @@ struct kernel_thread_frame
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
-static long long next_tick_to_awake = 0; /* # of timer ticks in wakeup_thread() should work. */
 
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
@@ -148,15 +147,7 @@ order_by_wakeup_tick(struct list_elem* a, struct list_elem* b)
 
 }
 
-void 
-update_awake_tick(long long wakeup_this_tick)
-{
-  if(wakeup_this_tick < next_tick_to_awake)
-    next_tick_to_awake = wakeup_this_tick;   
-}
-
-
-
+/* sleep current thread */
 void
 thread_sleep(long long wakeup_this_tick){
   enum intr_level old_level = intr_disable(); //disable interrupts.
@@ -167,12 +158,11 @@ thread_sleep(long long wakeup_this_tick){
   thread_block();
 
   intr_set_level(old_level);
-
 }
 
 
 
-
+/* wake up sleeping thread when tick is same with wake_up_tick   */
 void
 thread_wakeup (void)
 {
@@ -185,7 +175,6 @@ thread_wakeup (void)
     {
       cur = list_remove(cur); //cur removed, cur to next elem.
       thread_unblock(cur_thread);
-      next_tick_to_awake = list_entry(cur,struct thread,elem) -> wakeup_tick; //update next_tick_to_awake
     }
     else break; 
   }
@@ -193,20 +182,13 @@ thread_wakeup (void)
 }
 
 
-
-
-
-
-
-
-
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
 thread_tick (void) 
 {
-  if(timer_ticks () >= next_tick_to_awake)
-    thread_wakeup(); /* thread_wakeup() should find sleeping thread which needed to wake up. */
+  /* thread_wakeup() should find sleeping thread which needed to wake up. */
+  thread_wakeup(); 
      
   struct thread *t = thread_current ();
 

@@ -112,7 +112,6 @@ void thread_init (void);
 void thread_start (void);
 
 void thread_tick (void);
-void update_awake_tick(long long);
 void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
