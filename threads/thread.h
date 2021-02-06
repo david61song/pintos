@@ -128,6 +128,7 @@ void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 void thread_wakeup(void);
 void thread_sleep(long long);
+bool order_by_wakeup_tick(struct list_elem* a, struct list_elem* b);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
