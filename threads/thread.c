@@ -133,18 +133,11 @@ order_by_wakeup_tick(struct list_elem* a, struct list_elem* b)
   struct thread* thread_a = list_entry(a,struct thread,elem);
   struct thread* thread_b = list_entry(b,struct thread,elem);
 
-  if(thread_a -> wakeup_tick < thread_b -> wakeup_tick)
-    return true;
+  if(thread_a->wakeup_tick == thread_b->wakeup_tick)
+    return thread_a->priority > thread_b->priority;
 
-  else if(thread_a -> wakeup_tick == thread_b -> wakeup_tick)
-  {
-    if(thread_a -> priority > thread_b -> priority)
-      return true;
-    else return false;
-  }
-
-  else return false;
-
+  return thread_a->wakeup_tick < thread_b->wakeup_tick;
+  
 }
 
 /* list_less_function for ready_list_insert_ordered. Inserting thread in order by larger priority values. */
@@ -161,7 +154,7 @@ bool order_by_priority(struct list_elem* a, struct list_elem* b)
 void
 thread_sleep(long long wakeup_this_tick){
   enum intr_level old_level = intr_disable(); //disable interrupts.
-    struct thread* cur_thread = thread_current();
+  struct thread* cur_thread = thread_current();
   cur_thread -> wakeup_tick = wakeup_this_tick;
   list_insert_ordered(&sleeping_list, &cur_thread -> elem, order_by_wakeup_tick, NULL);
   thread_block();
