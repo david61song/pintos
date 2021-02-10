@@ -511,7 +511,6 @@ kernel_thread (thread_func *function, void *aux)
   function (aux);       /* Execute the thread function. */
   thread_exit ();       /* If function() returns, kill the thread. */
 }
-
 /* Returns the running thread. */
 struct thread *
 running_thread (void) 
@@ -623,9 +622,6 @@ thread_schedule_tail (struct thread *prev)
       palloc_free_page (prev);
     }
     
-  if (prev != NULL && prev -> status != THREAD_DYING)
-    if (prev -> priority > cur -> priority)
-      thread_yield(); 
 }
 
 /* Schedules a new process.  At entry, interrupts must be off and

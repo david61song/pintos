@@ -197,8 +197,17 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+   
+  if (lock -> holder != NULL) 
+    if (lock -> holder -> priority < thread_get_priority()) /* knock - knock */
+    {
+      lock -> holder -> priority = thread_get_priority();
+      thread_yield(); /* donate complete. */
+    }
+
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
+
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -232,8 +241,28 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
-  lock->holder = NULL;
+  if(!list_empty(&lock -> semaphore.waiters)) /*someone is waiting for lock acquire. */
+    {
+      struct list_elem* cur = list_front(&lock -> semaphore.waiters);
+      int left_waiters = list_size(&lock -> semaphore.waiters);
+      int first_waiter_priority = list_entry(list_front(&lock -> semaphore.waiters), \
+      struct thread,elem) -> priority;
+      
+      while(1)
+      { 
+        if(left_waiters == 0)
+          break;
+        struct thread* cur_thread = list_entry(cur,struct thread,elem);
+        cur_thread -> priority += 2;
+        cur = list_next(&lock -> semaphore.waiters);
+        left_waiters --;
+      }
+      
+    }
+
+  lock->holder = NULL;   
   sema_up (&lock->semaphore);
+
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -246,7 +275,7 @@ lock_held_by_current_thread (const struct lock *lock)
 
   return lock->holder == thread_current ();
 }
-
+
 /* One semaphore in a list. */
 struct semaphore_elem 
   {
