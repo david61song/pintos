@@ -1,4 +1,4 @@
-#pintos project
+# pintos project
 
 
 ## contributors
