@@ -142,7 +142,7 @@ order_by_wakeup_tick(struct list_elem* a, struct list_elem* b)
 
 /* comapre_function for ready_list_insert_ordered. Inserting thread in order by larger priority values. */
 bool 
-order_by_priority(struct list_elem* a, struct list_elem* b)
+thread_order_by_priority(struct list_elem* a, struct list_elem* b)
 {
   struct thread* thread_a = list_entry(a,struct thread,elem);
   struct thread* thread_b = list_entry(b,struct thread,elem);
@@ -319,7 +319,7 @@ thread_unblock (struct thread *t)
 
   ASSERT (t->status == THREAD_BLOCKED);
 
-  list_insert_ordered(&ready_list, &t->elem, order_by_priority, NULL);
+  list_insert_ordered(&ready_list, &t->elem, thread_order_by_priority, NULL);
   t->status = THREAD_READY;
 
   intr_set_level (old_level);
@@ -391,7 +391,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered(&ready_list, &cur->elem, order_by_priority, NULL);
+    list_insert_ordered(&ready_list, &cur->elem, thread_order_by_priority, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
