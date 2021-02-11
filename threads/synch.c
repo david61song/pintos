@@ -281,7 +281,18 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
+    int priority /* thread priority*/
   };
+
+/* comapre_function for semaphore_elem waiters_insert_ordered. Inserting larger priority values. */
+bool 
+semaphore_elem_order_by_priority(struct list_elem* a, struct list_elem* b)
+{
+  struct semaphore_elem* sema_elem_a = list_entry(a,struct semaphore_elem,elem);
+  struct semaphore_elem* sema_elem_b = list_entry(b,struct semaphore_elem, elem);
+  return sema_elem_a->priority > sema_elem_b->priority;
+}
+
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
@@ -318,6 +329,7 @@ void
 cond_wait (struct condition *cond, struct lock *lock) 
 {
   struct semaphore_elem waiter;
+  waiter.priority = thread_get_priority ();
 
   ASSERT (cond != NULL);
   ASSERT (lock != NULL);
@@ -325,7 +337,7 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_insert_ordered(&cond->waiters, &waiter.elem, order_by_priority, NULL);
+  list_insert_ordered(&cond->waiters, &waiter.elem, semaphore_elem_order_by_priority, NULL);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
