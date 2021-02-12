@@ -183,7 +183,7 @@ lock_init (struct lock *lock)
   ASSERT (lock != NULL);
 
   lock->holder = NULL;
-  lock->prev_holider_priority = PRI_MAX;
+  lock->original_holder_priority = PRI_MAX;
   sema_init (&lock->semaphore, 1);
 }
 
@@ -203,11 +203,15 @@ lock_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
 
   if (lock->holder != NULL && 
-          (lock->holder->priority < thread_get_priority ()))  /* knock - knock */
+     (lock->holder->priority < thread_get_priority ()))  /* knock - knock */
     {
-      lock->prev_holider_priority = lock->prev_holider_priority < lock->holder->priority ?              
-                  lock->prev_holider_priority : lock->holder->priority;
-      lock->holder->priority = thread_get_priority ();
+       /* if lock had been occupied and holder had lower priority, current thread must donate 
+       its priority. when holder release its lock, holder thread must return to its original 
+       priority value, so holder stores its original priority value in "original_holder_priority." */ 
+
+      lock->original_holder_priority = lock->original_holder_priority < lock->holder->priority ?               
+              lock->original_holder_priority : lock->holder->priority;
+      lock->holder->priority = thread_get_priority (); /*donating*/
       thread_yield (); /* donate complete. */
     }
 
@@ -247,9 +251,10 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
-  if(lock->prev_holider_priority != PRI_MAX)
-    lock->holder->priority = lock->prev_holider_priority;
-  lock->prev_holider_priority = PRI_MAX;
+  if(lock->original_holder_priority != PRI_MAX) /* return to original value. */
+    lock->holder->priority = lock->original_holder_priority;
+  
+  lock->original_holder_priority = PRI_MAX;
   lock->holder = NULL;   
   sema_up (&lock->semaphore);
 
