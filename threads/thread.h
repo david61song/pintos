@@ -89,16 +89,14 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     long long wakeup_tick;              /* Thread should wake up at this timer tick. */
-  
-  
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
   
-    int original_priority;
-    struct list holding_locks;   /*lock -> holder == this thread*/
-    struct lock* waiting_lock;   /* this thread waiting this lock*/
+    int original_priority;              /* init thread priority of set priority*/
+    struct list holding_locks;          /*lock -> holder == this thread*/
+    struct lock* waiting_lock;          /* this thread waiting this lock*/
     
 
 #ifdef USERPROG
@@ -141,6 +139,9 @@ bool thread_order_by_priority(struct list_elem* a, struct list_elem* b);
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
 
+void thread_set_waiting_lock(struct lock* lock_or_NULL);
+void thread_priority_donation_recursion (struct lock* lock);
+void thread_restore_priority(void);
 int thread_get_priority (void);
 void thread_set_priority (int);
 

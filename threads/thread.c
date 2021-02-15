@@ -414,38 +414,85 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+/*
+lock->waiters donate lock->holder if priority larger
+and nesty lock->holder nesty donate waiting lock holder recursibly
+*/
+void 
+thread_priority_donation_recursion (struct lock* lock)
+{
+  ASSERT (lock->holder != NULL);
+  ASSERT (lock != NULL);
+
+  /* knock - knock 
+  thread (in lock waiter) ----donate--- > lock->holder */
+  if (lock->holder->priority > thread_get_priority ())
+    return ;
+
+  lock->holder->priority = thread_get_priority ();
+
+  if (lock->holder->waiting_lock != NULL && 
+        lock->holder->waiting_lock->holder != NULL)
+      thread_priority_donation_recursion (lock->holder->waiting_lock);
+}
+
+
+/* Current thread set original_priority.
+    If thread is lock holder, priority is max of 
+    original priority or lock list waiters's priority */
+void
+thread_restore_priority(void)
+{
+  struct list_elem *lock_e;
+  struct list_elem *waiters_e;
+  struct lock *lock_tmp;
+  struct thread* waiting_thread;
+  int lock_max_priority = thread_current ()->original_priority;
+  
+  for (lock_e = list_begin (&thread_current ()->holding_locks); 
+        lock_e != list_end (&thread_current ()->holding_locks);
+         lock_e = list_next (lock_e))
+    {
+      lock_tmp = list_entry (lock_e, struct lock, elem);
+
+      if (list_empty (&lock_tmp->semaphore.waiters) || lock_tmp->holder != thread_current ())
+        continue;
+
+      ASSERT (&lock_tmp->holder != NULL);
+
+      /*find most large priority in lock*/
+      waiting_thread = list_entry (list_max (&lock_tmp->semaphore.waiters, thread_order_by_priority, NULL), struct thread, elem);
+      
+      ASSERT (waiting_thread != thread_current ());
+
+      lock_max_priority = waiting_thread->priority > lock_max_priority ? 
+          waiting_thread->priority : lock_max_priority ;
+    }
+
+  ASSERT (lock_max_priority >= thread_current ()->original_priority);
+
+  thread_current ()->priority = lock_max_priority;
+}
+
+/* Sets the current thread's waiting_lock to lock or NULL. */
+void
+thread_set_waiting_lock(struct lock* lock_or_NULL)
+{
+  thread_current ()->waiting_lock = lock_or_NULL;      
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
 {
-  /* 
-  TODO lock holder일경우. 뒤에 기다리는 놈이 있는경우 -> 바뀌지 않아야함.
-  유일한 holder -> 낮아짐 -> thread_yield
 
-
-  일반적인 동작  original priority도 바꿈.
- */
   struct thread* front_ready_thread = list_entry(list_begin(&ready_list), struct thread, elem);
-
-  /* check donated*/
-  int max_priority = 0;
-  struct list_elem *e;
-  for (e = list_begin (&thread_current ()->holding_locks); 
-  e != list_end (&thread_current ()->holding_locks);
-      e = list_next (e))
-  {
-    struct lock* lock_tmp = list_entry (e, struct lock, elem);
-    if(list_empty(&lock_tmp->semaphore.waiters))
-      continue;
-    int priority = list_entry(list_front(&lock_tmp->semaphore.waiters), struct thread, elem)->priority;
-    max_priority = max_priority > priority ? max_priority : priority;
-  }
-
-  ASSERT (thread_get_priority () >= max_priority)
-  if(new_priority > max_priority)
-       thread_current ()->priority = new_priority;
-
+  thread_current ()->priority = new_priority;
   thread_current ()->original_priority = new_priority;
+  /*  if thread is lock holder, 
+      priority is max of new priority or lock list waiters's priority  */
+  thread_restore_priority();
+  
   if (front_ready_thread->priority > thread_current ()->priority)
     thread_yield();
 }
@@ -574,7 +621,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
   t->original_priority = priority;
-  list_init(&t->holding_locks);
+  list_init (&t->holding_locks);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
