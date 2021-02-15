@@ -485,16 +485,28 @@ thread_set_waiting_lock(struct lock* lock_or_NULL)
 void
 thread_set_priority (int new_priority) 
 {
-
-  struct thread* front_ready_thread = list_entry(list_begin(&ready_list), struct thread, elem);
   thread_current ()->priority = new_priority;
   thread_current ()->original_priority = new_priority;
   /*  if thread is lock holder, 
       priority is max of new priority or lock list waiters's priority  */
   thread_restore_priority();
-  
-  if (front_ready_thread->priority > thread_current ()->priority)
-    thread_yield();
+
+  thread_yield();
+}
+
+/*
+lock push back or remove in holding locks
+*/
+void 
+thread_holding_locks_push_back(struct lock* lock)
+{
+  list_push_back (&thread_current ()->holding_locks, &lock->elem);  
+}
+
+void
+thread_holding_locks_remove(struct lock* lock)
+{
+  list_remove (&lock->elem);
 }
 
 /* Returns the current thread's priority. */

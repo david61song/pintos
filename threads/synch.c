@@ -211,7 +211,7 @@ lock_acquire (struct lock *lock)
   sema_down (&lock->semaphore);
   thread_set_waiting_lock (NULL);
   lock->holder = thread_current ();
-  list_push_back (&thread_current ()->holding_locks, &lock->elem);  
+  thread_holding_locks_push_back(lock);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -235,7 +235,6 @@ lock_try_acquire (struct lock *lock)
 }
 
 /* Releases LOCK, which must be owned by the current thread.
-
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
@@ -247,7 +246,7 @@ lock_release (struct lock *lock)
   ASSERT (!list_empty (&thread_current ()->holding_locks));
   ASSERT ( thread_current ()->priority >= thread_current ()->original_priority );
 
-  list_remove (&lock->elem);
+  thread_holding_locks_remove(lock);
   thread_restore_priority ();
 
   lock->holder = NULL;   
