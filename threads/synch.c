@@ -183,8 +183,26 @@ lock_init (struct lock *lock)
   ASSERT (lock != NULL);
 
   lock->holder = NULL;
-  lock->original_holder_priority = PRI_MAX;
   sema_init (&lock->semaphore, 1);
+}
+
+void 
+lock_holder_donation_recursion(struct lock* lock)
+{
+  ASSERT (lock->holder != NULL);
+  ASSERT (lock != NULL);
+
+  /* knock - knock 
+  thread (in lock waiter) ----donate--- > lock->holder */
+  if (lock->holder->priority <= thread_get_priority ())
+    {
+      lock->holder->priority = thread_get_priority ();
+      if (lock->holder->waiting_lock != NULL && 
+      lock->holder->waiting_lock->holder != NULL)
+        {
+          lock_holder_donation_recursion (lock->holder->waiting_lock);
+        }
+    }
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -202,22 +220,17 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  if (lock->holder != NULL && 
-     (lock->holder->priority < thread_get_priority ()))  /* knock - knock */
+  if (lock->holder != NULL)
     {
-       /* if lock had been occupied and holder had lower priority, current thread must donate 
-       its priority. when holder release its lock, holder thread must return to its original 
-       priority value, so holder stores its original priority value in "original_holder_priority." */ 
-
-      lock->original_holder_priority = lock->original_holder_priority < lock->holder->priority ?               
-              lock->original_holder_priority : lock->holder->priority;
-      lock->holder->priority = thread_get_priority (); /*donating*/
-      thread_yield (); /* donate complete. */
+      lock_holder_donation_recursion (lock);
+      thread_current ()->waiting_lock = lock;
+      thread_yield ();
     }
 
   sema_down (&lock->semaphore);
+  thread_current ()->waiting_lock = NULL;
   lock->holder = thread_current ();
-
+  list_push_back (&thread_current ()->holding_locks, &lock->elem);  
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -240,6 +253,44 @@ lock_try_acquire (struct lock *lock)
   return success;
 }
 
+void
+lock_reset_donation()
+{
+  struct list_elem *lock_e;
+  struct list_elem *waiters_e;
+  int lock_max_priority = thread_current ()->original_priority;
+  
+  if( thread_current ()->priority <= thread_current ()->original_priority)
+    return;
+  
+  for (lock_e = list_begin (&thread_current ()->holding_locks); 
+  lock_e != list_end (&thread_current ()->holding_locks);
+      lock_e = list_next (lock_e))
+    {
+      struct lock *lock_tmp = list_entry (lock_e, struct lock, elem);
+
+      if(list_empty (&lock_tmp->semaphore.waiters)|| lock_tmp->holder != thread_current ())
+        continue;
+
+      ASSERT(&lock_tmp->holder != NULL);
+
+      //find most large priority in lock
+      struct thread* waiting_thread = list_entry(list_max(&lock_tmp->semaphore.waiters, thread_order_by_priority, NULL), struct thread, elem);
+      
+      if( waiting_thread == thread_current())
+      {
+        continue;
+      }
+
+      lock_max_priority = waiting_thread->priority > lock_max_priority ? waiting_thread->priority : lock_max_priority ;
+    }
+
+  ASSERT (lock_max_priority >= thread_current ()->original_priority);
+  thread_current ()->priority = lock_max_priority;
+}
+
+ 
+
 /* Releases LOCK, which must be owned by the current thread.
 
    An interrupt handler cannot acquire a lock, so it does not
@@ -250,14 +301,19 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
+  ASSERT (!list_empty (&thread_current ()->holding_locks));
+  ASSERT ( thread_current ()->priority >= thread_current ()->original_priority );
+  /*
+  깨진 가정.
+  thread priority가 original 보다 낮을 수 있다.
+  빈 리스트가 있을 수 있다.
+  */
 
-  if(lock->original_holder_priority != PRI_MAX) /* return to original value. */
-    lock->holder->priority = lock->original_holder_priority;
-  
-  lock->original_holder_priority = PRI_MAX;
+  list_remove (&lock->elem);
+  lock_reset_donation();
+
   lock->holder = NULL;   
   sema_up (&lock->semaphore);
-
 }
 
 /* Returns true if the current thread holds LOCK, false

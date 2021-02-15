@@ -418,10 +418,35 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  /* 
+  TODO lock holder일경우. 뒤에 기다리는 놈이 있는경우 -> 바뀌지 않아야함.
+  유일한 holder -> 낮아짐 -> thread_yield
+
+
+  일반적인 동작  original priority도 바꿈.
+ */
   struct thread* front_ready_thread = list_entry(list_begin(&ready_list), struct thread, elem);
 
-  thread_current ()->priority = new_priority;
-  if (front_ready_thread->priority > new_priority)
+  /* check donated*/
+  int max_priority = 0;
+  struct list_elem *e;
+  for (e = list_begin (&thread_current ()->holding_locks); 
+  e != list_end (&thread_current ()->holding_locks);
+      e = list_next (e))
+  {
+    struct lock* lock_tmp = list_entry (e, struct lock, elem);
+    if(list_empty(&lock_tmp->semaphore.waiters))
+      continue;
+    int priority = list_entry(list_front(&lock_tmp->semaphore.waiters), struct thread, elem)->priority;
+    max_priority = max_priority > priority ? max_priority : priority;
+  }
+
+  ASSERT (thread_get_priority () >= max_priority)
+  if(new_priority > max_priority)
+       thread_current ()->priority = new_priority;
+
+  thread_current ()->original_priority = new_priority;
+  if (front_ready_thread->priority > thread_current ()->priority)
     thread_yield();
 }
 
@@ -548,6 +573,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+  t->original_priority = priority;
+  list_init(&t->holding_locks);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
