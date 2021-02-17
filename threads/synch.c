@@ -177,6 +177,16 @@ sema_test_helper (void *sema_)
    acquire and release it.  When these restrictions prove
    onerous, it's a good sign that a semaphore should be used,
    instead of a lock. */
+
+   /* One semaphore in a list. */
+struct semaphore_elem 
+  {
+    struct list_elem elem;              /* List element. */
+    struct semaphore semaphore;         /* This semaphore. */
+    int priority /* thread priority*/
+  };
+
+  
 void
 lock_init (struct lock *lock)
 {
@@ -203,15 +213,15 @@ lock_acquire (struct lock *lock)
 
   if (lock->holder != NULL)
     {
-      thread_priority_donation_recursion (lock);
+      thread_priority_donate (lock);
       thread_set_waiting_lock (lock);
-      thread_yield ();
+      thread_yield (); /* yields the CPU to donatee thread .*/
     }
 
   sema_down (&lock->semaphore);
   thread_set_waiting_lock (NULL);
   lock->holder = thread_current ();
-  thread_holding_locks_push_back(lock);
+  thread_holding_locks_push_back(lock); /* Append this lock to "holding locks". */
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -244,9 +254,10 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
   ASSERT (!list_empty (&thread_current ()->holding_locks));
-  ASSERT ( thread_current ()->priority >= thread_current ()->original_priority );
+  ASSERT (thread_current ()->priority >= thread_current ()->original_priority );
 
-  thread_holding_locks_remove(lock);
+  thread_holding_locks_remove(lock); /* remove this lock from holding_locks. This threads is not holding 
+                                        this lock anymore */
   thread_restore_priority ();
 
   lock->holder = NULL;   
@@ -264,20 +275,13 @@ lock_held_by_current_thread (const struct lock *lock)
   return lock->holder == thread_current ();
 }
 
-/* One semaphore in a list. */
-struct semaphore_elem 
-  {
-    struct list_elem elem;              /* List element. */
-    struct semaphore semaphore;         /* This semaphore. */
-    int priority /* thread priority*/
-  };
 
 /* comapre_function for semaphore_elem waiters_insert_ordered. Inserting larger priority values. */
 bool 
 semaphore_elem_order_by_priority(struct list_elem* a, struct list_elem* b)
 {
   struct semaphore_elem* sema_elem_a = list_entry(a,struct semaphore_elem,elem);
-  struct semaphore_elem* sema_elem_b = list_entry(b,struct semaphore_elem, elem);
+  struct semaphore_elem* sema_elem_b = list_entry(b,struct semaphore_elem,elem);
   return sema_elem_a->priority > sema_elem_b->priority;
 }
 
@@ -289,7 +293,6 @@ void
 cond_init (struct condition *cond)
 {
   ASSERT (cond != NULL);
-
   list_init (&cond->waiters);
 }
 
@@ -313,6 +316,8 @@ cond_init (struct condition *cond)
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+
+
 void
 cond_wait (struct condition *cond, struct lock *lock) 
 {
@@ -325,7 +330,8 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_insert_ordered(&cond->waiters, &waiter.elem, semaphore_elem_order_by_priority, NULL);
+  list_insert_ordered(&cond->waiters, &waiter.elem, semaphore_elem_order_by_priority,NULL);
+
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);

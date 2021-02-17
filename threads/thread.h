@@ -94,9 +94,9 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
   
-    int original_priority;              /* init thread priority of set priority*/
-    struct list holding_locks;          /*lock -> holder == this thread*/
-    struct lock* waiting_lock;          /* this thread waiting this lock*/
+    int original_priority;              /* Original value of thread priority. This value never changes.*/
+    struct list holding_locks;          /* List of lock that this thread holds.*/
+    struct lock* waiting_lock;          /* Lock that this thread is waiting for. This value can be NULL or lock.*/
     
 
 #ifdef USERPROG
@@ -143,7 +143,7 @@ void thread_holding_locks_push_back(struct lock* lock);
 void thread_holding_locks_remove(struct lock* lock);
 
 void thread_set_waiting_lock(struct lock* lock_or_NULL);
-void thread_priority_donation_recursion (struct lock* lock);
+void thread_priority_donate(struct lock* lock);
 void thread_restore_priority(void);
 int thread_get_priority (void);
 void thread_set_priority (int);
