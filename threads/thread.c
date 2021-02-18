@@ -128,7 +128,7 @@ thread_start (void)
 
 
 /* list_less_function for sleeping_list_insert_ordered. Inserting thread in order by smaller wakeup_tick values. */
-bool
+static bool
 order_by_wakeup_tick(const struct list_elem* a,const struct list_elem* b,void* aux UNUSED)
 {
   struct thread* thread_a = list_entry(a,struct thread,elem);

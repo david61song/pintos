@@ -134,7 +134,6 @@ void thread_yield (void);
 void thread_wakeup(void);
 void thread_sleep(long long);
 bool thread_order_by_priority(const struct list_elem* a, const struct list_elem* b,void* aux);
-bool order_by_wakeup_tick(const struct list_elem* a, const struct list_elem* b,void* aux);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
