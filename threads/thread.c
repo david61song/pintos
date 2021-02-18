@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -128,7 +129,7 @@ thread_start (void)
 
 /* list_less_function for sleeping_list_insert_ordered. Inserting thread in order by smaller wakeup_tick values. */
 bool
-order_by_wakeup_tick(struct list_elem* a, struct list_elem* b)
+order_by_wakeup_tick(const struct list_elem* a,const struct list_elem* b,void* aux UNUSED)
 {
   struct thread* thread_a = list_entry(a,struct thread,elem);
   struct thread* thread_b = list_entry(b,struct thread,elem);
@@ -142,7 +143,7 @@ order_by_wakeup_tick(struct list_elem* a, struct list_elem* b)
 
 /* comapre_function for ready_list_insert_ordered. Inserting thread in order by larger priority values. */
 bool 
-thread_order_by_priority(struct list_elem* a, struct list_elem* b)
+thread_order_by_priority(const struct list_elem* a,const struct list_elem* b,void* aux UNUSED)
 {
   struct thread* thread_a = list_entry(a,struct thread,elem);
   struct thread* thread_b = list_entry(b,struct thread,elem);

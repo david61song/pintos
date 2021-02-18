@@ -183,7 +183,7 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
-    int priority /* thread priority*/
+    int priority; /* thread priority*/
   };
 
   
@@ -278,7 +278,7 @@ lock_held_by_current_thread (const struct lock *lock)
 
 /* comapre_function for semaphore_elem waiters_insert_ordered. Inserting larger priority values. */
 bool 
-semaphore_elem_order_by_priority(struct list_elem* a, struct list_elem* b)
+semaphore_elem_order_by_priority(const struct list_elem* a, const struct list_elem* b,void* aux UNUSED)
 {
   struct semaphore_elem* sema_elem_a = list_entry(a,struct semaphore_elem,elem);
   struct semaphore_elem* sema_elem_b = list_entry(b,struct semaphore_elem,elem);
