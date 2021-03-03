@@ -107,22 +107,31 @@ sema_try_down (struct semaphore *sema)
 
    This function may be called from an interrupt handler. */
 void
-sema_up (struct semaphore *sema) 
+sema_up (struct semaphore* sema) 
 {
   enum intr_level old_level;
-
   ASSERT (sema != NULL);
-
   old_level = intr_disable ();
+  
   if (!list_empty (&sema->waiters)) 
-  {
-    list_sort (&sema->waiters, thread_order_by_priority, NULL);
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  { 
+    list_sort (&sema->waiters, thread_order_by_priority, NULL); 
+    struct thread* blocked = list_entry (list_pop_front (&sema->waiters),
+                                struct thread, elem);
+    thread_unblock (blocked);
+    sema->value++;
+    intr_set_level (old_level);
+    
+    if(blocked -> priority > thread_current() -> priority)
+      thread_yield();
+    
   }
-  sema->value++;
-  intr_set_level (old_level);
-  thread_yield();
+  
+  else
+  {
+    sema->value++;
+    intr_set_level (old_level);
+  }
 }
 
 static void sema_test_helper (void *sema_);
