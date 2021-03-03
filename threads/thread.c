@@ -33,6 +33,7 @@ static struct list all_list;
   when they are slept by timer_sleep(); */
 static struct list sleeping_list;
 
+static bool is_thread_started = false;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -116,7 +117,7 @@ thread_start (void)
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
-
+  is_thread_started = true;
   /* Start preemptive thread scheduling. */
   intr_enable ();
 
@@ -297,6 +298,11 @@ thread_block (void)
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
 
+  if(!is_thread_started)
+  {
+    return ;
+  }
+
   thread_current ()->status = THREAD_BLOCKED;
   schedule ();
 }
@@ -385,6 +391,11 @@ thread_exit (void)
 void
 thread_yield (void) 
 {
+  if(!is_thread_started)
+  {
+    return ;
+  }
+
   struct thread *cur = thread_current ();
   enum intr_level old_level;
   
